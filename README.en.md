@@ -48,7 +48,7 @@ Use the `listenmark-v...` prerelease for the international edition.
 - The copy icon copies immediately, then shows a small save affordance.
 - Replay uses the existing generated result instead of asking the model again.
 - Screen selection OCR is available from Settings as a fallback hotkey. Default: `Control + Shift + O`.
-- Automatic updates follow the matching GitHub release channel, so Chinese and international builds do not cross-update.
+- Automatic updates follow the matching GitHub release channel, verify the downloaded app, and install it directly when macOS permissions allow. Chinese and international builds do not cross-update.
 
 ## Quick Start
 
