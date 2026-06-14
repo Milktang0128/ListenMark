@@ -1,0 +1,7 @@
+.DS_Store
+/.build/
+/*.app/
+/release/
+/.claude/
+*.xcuserstate
+*.swp
