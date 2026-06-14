@@ -214,7 +214,7 @@ private struct ActionEditor: View {
                         }
                         .controlSize(.small)
                         .disabled(optimizingPrompt || target.def.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        .help(AppFlavor.text("用当前 DeepSeek 模型优化这个技能提示词", "Optimize this action prompt with the current DeepSeek model"))
+                        .help(AppFlavor.text("用当前 AI 模型优化这个技能提示词", "Optimize this action prompt with the current AI model"))
                     }
                     TextEditor(text: $target.def.prompt)
                         .font(.system(size: 12))
@@ -253,8 +253,8 @@ private struct ActionEditor: View {
         let name = target.def.name.trimmingCharacters(in: .whitespacesAndNewlines)
         let current = target.def.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !current.isEmpty else { return }
-        guard !Settings.deepseekKey.isEmpty else {
-            optimizeError = AppFlavor.text("请先在设置里填写 DeepSeek API Key。", "Add your DeepSeek API Key in Settings first.")
+        guard !Settings.llmAPIKey.isEmpty else {
+            optimizeError = AppFlavor.text("请先在设置里填写 AI 接口 API Key。", "Add your AI API key in Settings first.")
             return
         }
 
@@ -319,9 +319,10 @@ private struct ActionEditor: View {
     private static func describe(_ error: Error) -> String {
         if let e = error as? LLMError {
             switch e {
-            case .noKey: return AppFlavor.text("请先在设置里填写 DeepSeek API Key。", "Add your DeepSeek API Key in Settings first.")
-            case .http(let code, let msg): return AppFlavor.text("DeepSeek 请求失败：HTTP \(code) \(msg.prefix(120))", "DeepSeek request failed: HTTP \(code) \(msg.prefix(120))")
-            case .badResponse: return AppFlavor.text("DeepSeek 响应解析失败。", "Could not parse the DeepSeek response.")
+            case .noKey: return AppFlavor.text("请先在设置里填写 AI 接口 API Key。", "Add your AI API key in Settings first.")
+            case .badURL: return AppFlavor.text("AI 接口地址无效。", "The AI endpoint URL is invalid.")
+            case .http(let code, let msg): return AppFlavor.text("AI 请求失败：HTTP \(code) \(msg.prefix(120))", "AI request failed: HTTP \(code) \(msg.prefix(120))")
+            case .badResponse: return AppFlavor.text("AI 响应解析失败。", "Could not parse the AI response.")
             }
         }
         return error.localizedDescription

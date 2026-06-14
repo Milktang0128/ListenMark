@@ -27,6 +27,7 @@ final class PanelModel: ObservableObject {
     var onArchiveOriginal: (() -> Void)?
     var onCopyOriginal: (() -> Bool)?
     var onCopyResult: ((String) -> Bool)?
+    var onAutoSpeakChanged: ((Bool) -> Void)?
     var onClose: (() -> Void)?
     var onOpenArchive: (() -> Void)?
     var onOpenSettings: (() -> Void)?
@@ -43,6 +44,7 @@ struct ActionPanelView: View {
     @State private var resultCopyArchived = false
     @State private var originalCopyToken = UUID()
     @State private var resultCopyToken = UUID()
+    @AppStorage("autoSpeakAI") private var autoSpeakAI = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -157,6 +159,7 @@ struct ActionPanelView: View {
                 ProgressView().controlSize(.small)
                 Text(AppFlavor.text("正在\(label)…", "\(label) in progress...")).font(.system(size: 13)).foregroundStyle(.secondary)
                 Spacer()
+                autoSpeakToggle
             }
             .padding(.horizontal, 14).padding(.vertical, 13)
 
@@ -197,6 +200,8 @@ struct ActionPanelView: View {
                     .frame(maxHeight: 64)
                     .padding(9)
                     .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.045)))
+
+                    autoSpeakToggle
                 }
 
                 controls(text: text, replay: replay, archived: archived)
@@ -218,11 +223,15 @@ struct ActionPanelView: View {
     private func controls(text: String, replay: Bool, archived: Bool) -> some View {
         HStack(spacing: 7) {
             if replay {
-                Button { model.onReplay?() } label: { Label(AppFlavor.text("重听", "Replay"), systemImage: "play.fill") }
-                    .buttonStyle(.borderedProminent)
+                Button { model.onReplay?() } label: {
+                    Image(systemName: "play.fill")
+                }
+                .buttonStyle(.borderedProminent)
+                .help(AppFlavor.text("重听", "Replay"))
             }
-            Button { model.onStop?() } label: { Label(AppFlavor.text("停止", "Stop"), systemImage: "stop.fill") }
+            Button { model.onStop?() } label: { Image(systemName: "stop.fill") }
                 .buttonStyle(.bordered)
+                .help(AppFlavor.text("停止", "Stop"))
             Button {
                 if model.onCopyResult?(text) == true {
                     presentResultCopyBubble()
@@ -250,6 +259,19 @@ struct ActionPanelView: View {
         }
         .controlSize(.small)
         .buttonBorderShape(.capsule)
+    }
+
+    private var autoSpeakToggle: some View {
+        Toggle(isOn: Binding(get: { autoSpeakAI }, set: { enabled in
+            autoSpeakAI = enabled
+            model.onAutoSpeakChanged?(enabled)
+        })) {
+            Text(AppFlavor.text("自动朗读", "Auto Read"))
+                .font(.system(size: 11))
+        }
+        .toggleStyle(.checkbox)
+        .help(AppFlavor.text("生成完成后自动朗读 AI 结果", "Read AI results automatically when generation completes"))
+        .fixedSize()
     }
 
     private func presentOriginalCopyBubble() {

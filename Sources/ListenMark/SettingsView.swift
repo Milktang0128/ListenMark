@@ -13,8 +13,9 @@ struct SettingsView: View {
     @AppStorage("autoArchive") private var autoArchive = false
     @AppStorage("archiveFolder") private var archiveFolder = ""
 
-    @AppStorage("deepseekKey") private var deepseekKey = ""
-    @AppStorage("deepseekModel") private var deepseekModel = "deepseek-v4-flash"
+    @AppStorage("llmBaseURL") private var llmBaseURL = Settings.recommendedLLMBaseURL
+    @AppStorage("deepseekKey") private var llmAPIKey = ""
+    @AppStorage("deepseekModel") private var llmModel = Settings.recommendedLLMModel
     @AppStorage("useFullContext") private var useFullContext = true
 
     @AppStorage("ttsEngine") private var ttsEngine = AppFlavor.text("volcano", "local")
@@ -106,16 +107,24 @@ struct SettingsView: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
 
-            Section(AppFlavor.text("解释 / 翻译模型（DeepSeek）", "AI Model (DeepSeek)")) {
+            Section(AppFlavor.text("AI 模型（OpenAI 兼容）", "AI Model (OpenAI-compatible)")) {
                 Toggle(AppFlavor.text("默认使用全文上下文", "Use full-text context by default"), isOn: $useFullContext)
                 Text(AppFlavor.text("开启后，解释、翻译、提炼、背景和自定义技能会尽量读取当前文本控件或页面的可访问上下文，只把它作为选中内容的参考；拿不到时自动回退。", "When enabled, AI actions try to read accessible surrounding text and use it only as context for the selected text. If context is unavailable, they fall back automatically."))
                     .font(.caption).foregroundStyle(.secondary)
-                SecureField(AppFlavor.text("DeepSeek API Key（sk-…）", "DeepSeek API Key (sk-...)"), text: $deepseekKey)
-                TextField(AppFlavor.text("模型", "Model"), text: $deepseekModel)
-                Text(AppFlavor.text("默认 deepseek-v4-flash（快）；也可填 deepseek-chat / deepseek-reasoner。", "Default is deepseek-v4-flash for speed. You can also use deepseek-chat or deepseek-reasoner."))
+                TextField(AppFlavor.text("Base URL，例如 https://api.deepseek.com", "Base URL, e.g. https://api.deepseek.com"), text: $llmBaseURL)
+                SecureField(AppFlavor.text("API Key（Bearer Token）", "API Key (Bearer token)"), text: $llmAPIKey)
+                TextField(AppFlavor.text("模型", "Model"), text: $llmModel)
+                Text(AppFlavor.text("默认预填 DeepSeek 推荐配置：Base URL 为 https://api.deepseek.com，模型为 deepseek-v4-flash。也可填写任何 OpenAI 兼容接口的 Base URL，例如以 /v1 结尾的服务；若直接填到 /chat/completions，也会按完整地址使用。", "DeepSeek is prefilled as the recommended default: Base URL https://api.deepseek.com and model deepseek-v4-flash. You can use any OpenAI-compatible Base URL, including /v1 endpoints; a full /chat/completions URL is also accepted."))
                     .font(.caption).foregroundStyle(.secondary)
-                Link(AppFlavor.text("前往 DeepSeek 获取 API Key ↗", "Get a DeepSeek API Key ↗"), destination: URL(string: "https://platform.deepseek.com/api_keys")!)
-                    .font(.caption)
+                HStack {
+                    Link(AppFlavor.text("前往 DeepSeek 获取 API Key ↗", "Get a DeepSeek API Key ↗"), destination: URL(string: "https://platform.deepseek.com/api_keys")!)
+                        .font(.caption)
+                    Spacer()
+                    Button(AppFlavor.text("恢复 DeepSeek 推荐", "Use DeepSeek Defaults")) {
+                        llmBaseURL = Settings.recommendedLLMBaseURL
+                        llmModel = Settings.recommendedLLMModel
+                    }
+                }
             }
 
             Section(AppFlavor.text("语音合成", "Text-to-Speech")) {

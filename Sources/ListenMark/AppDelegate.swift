@@ -89,6 +89,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self.copyToPasteboard(text)
             return true
         }
+        m.onAutoSpeakChanged = { enabled in
+            if !enabled {
+                Speaker.shared.stop()
+            }
+        }
         m.onClose = { [weak self] in self?.closePanel() }
         m.onOpenArchive = { [weak self] in self?.openArchive() }
         m.onOpenSettings = { [weak self] in self?.openSettings() }
@@ -362,8 +367,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let generation = actionGeneration
         panel.model.active = action.id
 
-        if action.needsLLM && Settings.deepseekKey.isEmpty {
-            panel.model.phase = .error(AppFlavor.text("「\(action.name)」需要 DeepSeek API Key，请到「设置」填写", "\(action.name) needs a DeepSeek API Key. Add it in Settings."))
+        if action.needsLLM && Settings.llmAPIKey.isEmpty {
+            panel.model.phase = .error(AppFlavor.text("「\(action.name)」需要 API Key，请到「设置」填写 OpenAI 兼容接口配置", "\(action.name) needs an API key. Add your OpenAI-compatible API settings in Settings."))
             return
         }
 
@@ -406,7 +411,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 let finalText = full
                 await MainActor.run {
                     guard self.actionGeneration == generation else { return }
-                    Speaker.shared.speak(finalText)
+                    if Settings.autoSpeakAI {
+                        Speaker.shared.speak(finalText)
+                    }
                     self.finishResult(action: action, source: source, original: text, response: finalText,
                                       spoken: finalText, contextUsed: request.contextUsed)
                 }
@@ -558,7 +565,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private static func describe(_ error: Error) -> String {
         if let e = error as? LLMError {
             switch e {
-            case .noKey: return AppFlavor.text("未设置 DeepSeek API Key", "DeepSeek API Key is missing")
+            case .noKey: return AppFlavor.text("未设置 API Key", "API key is missing")
+            case .badURL: return AppFlavor.text("AI 接口地址无效", "AI endpoint URL is invalid")
             case .http(let code, let msg): return "HTTP \(code) \(msg.prefix(120))"
             case .badResponse: return AppFlavor.text("响应解析失败", "Could not parse the response")
             }

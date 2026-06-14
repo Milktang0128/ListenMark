@@ -28,11 +28,14 @@ Use the `listenmark-v...` prerelease for the international edition.
 | Feature | What it does | Requirement |
 |---|---|---|
 | Read | Speaks selected text directly | None |
-| Explain | Explains the selected text in clear English | DeepSeek API key |
-| Translate | Translates foreign text to English, or rewrites English more clearly | DeepSeek API key |
-| Summarize | Gives the core takeaway | DeepSeek API key |
-| Context | Adds the background needed to understand the selection | DeepSeek API key |
-| Custom actions | Add up to 4 personal prompt-based actions | DeepSeek API key |
+| Explain | Explains the selected text in clear English | OpenAI-compatible API key |
+| Translate | Translates foreign text to English, or rewrites English more clearly | OpenAI-compatible API key |
+| Summarize | Gives the core takeaway | OpenAI-compatible API key |
+| Context | Adds background needed to understand the selection, off by default | OpenAI-compatible API key |
+| Insight | Surfaces deeper meaning, values, tension, or implications, off by default | OpenAI-compatible API key |
+| Blind Spots | Finds missing assumptions, weak points, and follow-up checks, off by default | OpenAI-compatible API key |
+| Proofread | Reviews a writing draft with minimal edit suggestions, off by default | OpenAI-compatible API key |
+| Custom actions | Add up to 4 personal prompt-based actions | OpenAI-compatible API key |
 | Screen OCR | Select a screen region when direct text capture fails | None |
 | Archive | Save source text, result, app, time, and context excerpt locally | None |
 | Review | Replay and review saved items | None |
@@ -44,7 +47,7 @@ Use the `listenmark-v...` prerelease for the international edition.
 - Saved context stays lightweight: only about 200 characters before and after the selection are archived, with the selection marked.
 - Every action can have its own global hotkey. Defaults: Read `Control + Shift + R`, Explain `Control + Shift + E`, Translate `Control + Shift + T`.
 - Read always stays first; other actions can be reordered, disabled, edited, or moved into the More menu.
-- The action editor includes AI Optimize for improving prompts with your current DeepSeek model.
+- The action editor includes AI Optimize for improving prompts with your current AI model.
 - The copy icon copies immediately, then shows a small save affordance.
 - Replay uses the existing generated result instead of asking the model again.
 - Screen selection OCR is available from Settings as a fallback hotkey. Default: `Control + Shift + O`.
@@ -53,7 +56,7 @@ Use the `listenmark-v...` prerelease for the international edition.
 ## Quick Start
 
 1. Open ListenMark and grant Accessibility permission when macOS asks.
-2. Add your DeepSeek API key in Settings for AI actions.
+2. Add an OpenAI-compatible API key in Settings for AI actions. DeepSeek is prefilled as the recommended default provider.
 3. Select text in any app.
 4. Use the floating panel, menu bar item, or an action hotkey.
 5. Save useful results to the local archive.
@@ -110,5 +113,5 @@ swift run
 
 - Direct capture depends on macOS Accessibility and, when needed, a simulated copy fallback. Some apps may block both.
 - Full-text context is best effort. When it is unavailable, ListenMark falls back to the selected text.
-- AI actions require DeepSeek's OpenAI-compatible API.
+- AI actions require an OpenAI-compatible Chat Completions API. DeepSeek is the prefilled recommended default.
 - The international edition defaults to local macOS speech; Volcengine TTS is optional and can use a custom `voice_type`.

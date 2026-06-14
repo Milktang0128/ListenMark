@@ -2,19 +2,21 @@ import Foundation
 
 enum LLMError: Error {
     case noKey
+    case badURL
     case http(Int, String)
     case badResponse
 }
 
-/// Text actions via DeepSeek's OpenAI-compatible Chat Completions API.
+/// Text actions via an OpenAI-compatible Chat Completions API.
 /// Takes a system prompt (from the action) + the selected text.
 enum LLMClient {
 
     static func complete(prompt: String, text: String) async throws -> String {
-        let key = Settings.deepseekKey
+        let key = Settings.llmAPIKey
         guard !key.isEmpty else { throw LLMError.noKey }
+        guard let url = Settings.llmChatCompletionsURL else { throw LLMError.badURL }
 
-        var req = URLRequest(url: URL(string: "https://api.deepseek.com/chat/completions")!)
+        var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -39,10 +41,11 @@ enum LLMClient {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    let key = Settings.deepseekKey
+                    let key = Settings.llmAPIKey
                     guard !key.isEmpty else { throw LLMError.noKey }
+                    guard let url = Settings.llmChatCompletionsURL else { throw LLMError.badURL }
 
-                    var req = URLRequest(url: URL(string: "https://api.deepseek.com/chat/completions")!)
+                    var req = URLRequest(url: url)
                     req.httpMethod = "POST"
                     req.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
                     req.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -85,7 +88,7 @@ enum LLMClient {
 
     private static func requestBody(prompt: String, text: String, stream: Bool) -> [String: Any] {
         [
-            "model": Settings.deepseekModel,
+            "model": Settings.llmModel,
             "messages": [
                 ["role": "system", "content": prompt + "\n\n" + plainTextRule],
                 ["role": "user", "content": text]

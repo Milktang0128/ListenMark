@@ -7,24 +7,59 @@ import Carbon.HIToolbox
 enum Settings {
     private static let d = UserDefaults.standard
 
-    // MARK: Text actions — DeepSeek
+    // MARK: Text actions — OpenAI-compatible chat completions
 
-    static var deepseekKey: String {
+    static let recommendedLLMBaseURL = "https://api.deepseek.com"
+    static let recommendedLLMModel = "deepseek-v4-flash"
+
+    static var llmBaseURL: String {
+        get {
+            d.string(forKey: "llmBaseURL") ?? recommendedLLMBaseURL
+        }
+        set { d.set(newValue, forKey: "llmBaseURL") }
+    }
+
+    static var llmAPIKey: String {
         get { d.string(forKey: "deepseekKey") ?? "" }
         set { d.set(newValue, forKey: "deepseekKey") }
     }
 
-    static var deepseekModel: String {
+    static var llmModel: String {
         get {
             let m = d.string(forKey: "deepseekModel") ?? ""
-            return m.isEmpty ? "deepseek-v4-flash" : m
+            return m.isEmpty ? recommendedLLMModel : m
         }
         set { d.set(newValue, forKey: "deepseekModel") }
+    }
+
+    static var llmChatCompletionsURL: URL? {
+        let raw = llmBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !raw.isEmpty else { return nil }
+        let normalized = raw.hasSuffix("/") ? String(raw.dropLast()) : raw
+        if normalized.lowercased().hasSuffix("/chat/completions") {
+            return URL(string: normalized)
+        }
+        return URL(string: normalized + "/chat/completions")
+    }
+
+    static var deepseekKey: String {
+        get { llmAPIKey }
+        set { llmAPIKey = newValue }
+    }
+
+    static var deepseekModel: String {
+        get { llmModel }
+        set { llmModel = newValue }
     }
 
     static var useFullContext: Bool {
         get { d.object(forKey: "useFullContext") == nil ? true : d.bool(forKey: "useFullContext") }
         set { d.set(newValue, forKey: "useFullContext") }
+    }
+
+    static var autoSpeakAI: Bool {
+        get { d.object(forKey: "autoSpeakAI") == nil ? true : d.bool(forKey: "autoSpeakAI") }
+        set { d.set(newValue, forKey: "autoSpeakAI") }
     }
 
     // MARK: Speech engine
