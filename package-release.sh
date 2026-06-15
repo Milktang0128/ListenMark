@@ -8,6 +8,7 @@ BUILD="${BUILD:-30}"
 ARCH="${ARCH:-arm64}"
 IDENTITY="${CODESIGN_IDENTITY:-Developer ID Application: Zhi Tang (LB8ZBRDP63)}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-myskills-notary}"
+NOTARY_KEYCHAIN="${NOTARY_KEYCHAIN:-$HOME/Library/Keychains/login.keychain-db}"
 
 package_one() {
   local flavor="$1"
@@ -48,7 +49,7 @@ package_one() {
 
   echo "==> Notarizing ${zip}"
   tmp_notary="$(mktemp)"
-  xcrun notarytool submit "$zip" --keychain-profile "$NOTARY_PROFILE" --wait --output-format json | tee "$tmp_notary"
+  xcrun notarytool submit "$zip" --keychain-profile "$NOTARY_PROFILE" --keychain "$NOTARY_KEYCHAIN" --wait --output-format json | tee "$tmp_notary"
   mv "$tmp_notary" "$app_notary"
   xcrun stapler staple "$app_path"
   xcrun stapler validate "$app_path"
@@ -65,7 +66,7 @@ package_one() {
 
   echo "==> Notarizing ${dmg}"
   tmp_notary="$(mktemp)"
-  xcrun notarytool submit "$dmg" --keychain-profile "$NOTARY_PROFILE" --wait --output-format json | tee "$tmp_notary"
+  xcrun notarytool submit "$dmg" --keychain-profile "$NOTARY_PROFILE" --keychain "$NOTARY_KEYCHAIN" --wait --output-format json | tee "$tmp_notary"
   mv "$tmp_notary" "$dmg_notary"
   xcrun stapler staple "$dmg"
   xcrun stapler validate "$dmg"
