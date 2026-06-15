@@ -375,15 +375,7 @@ struct ActionPanelView: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .truncationMode(.tail)
-                    if contextUsed {
-                        Label(AppFlavor.text("已附带上下文", "Context included"), systemImage: "doc.text.magnifyingglass")
-                            .font(.system(size: 10, weight: .medium))
-                            .labelStyle(.titleAndIcon)
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Capsule().fill(Color.primary.opacity(0.06)))
-                    }
+                    contextStatusPill(contextUsed: contextUsed)
                     speechStatusPill
                     Spacer()
                     if archived {
@@ -420,15 +412,7 @@ struct ActionPanelView: View {
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
-                    if contextUsed {
-                        Label(AppFlavor.text("已附带上下文", "Context included"), systemImage: "doc.text.magnifyingglass")
-                            .font(.system(size: 10, weight: .medium))
-                            .labelStyle(.titleAndIcon)
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Capsule().fill(Color.primary.opacity(0.06)))
-                    }
+                    contextStatusPill(contextUsed: contextUsed)
                     Spacer()
                     if archived {
                         archiveStatusLabel
@@ -567,6 +551,18 @@ struct ActionPanelView: View {
                 .background(Capsule().fill(Color.accentColor.opacity(0.10)))
                 .help(AppFlavor.text("正在通过 \(provider) 生成语音，稍后会自动播放。",
                                      "Generating speech with \(provider). Playback will start shortly."))
+        }
+    }
+
+    @ViewBuilder private func contextStatusPill(contextUsed: Bool) -> some View {
+        if contextUsed {
+            Label(AppFlavor.text("已附带上下文", "Context included"), systemImage: "doc.text.magnifyingglass")
+                .font(.system(size: 10, weight: .medium))
+                .labelStyle(.titleAndIcon)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Capsule().fill(Color.primary.opacity(0.06)))
         }
     }
 

@@ -1060,6 +1060,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let cleanContext = context.trimmingCharacters(in: .whitespacesAndNewlines)
         let sourceBlock = sourceMetadata?.modelContextBlock
         let hasFullTextContext = !cleanContext.isEmpty && cleanContext != selectedText
+        let hasReadableSourceContext = sourceMetadata?.hasReadableContext == true
         guard hasFullTextContext || sourceBlock != nil else { return (action.prompt, selectedText, false) }
 
         let prompt = action.prompt + "\n\n" + AppFlavor.text(
@@ -1080,7 +1081,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             zhBlocks.joined(separator: "\n\n"),
             enBlocks.joined(separator: "\n\n")
         )
-        return (prompt, text, hasFullTextContext)
+        return (prompt, text, hasFullTextContext || hasReadableSourceContext)
     }
 
     private func contextText(for selectedText: String) -> String {

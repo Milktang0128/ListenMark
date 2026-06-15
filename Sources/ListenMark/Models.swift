@@ -96,6 +96,13 @@ struct SourceMetadata: Codable, Equatable {
         return nil
     }
 
+    var hasReadableContext: Bool {
+        if let pageURL, !pageURL.isEmpty { return true }
+        if let pageTitle, !pageTitle.isEmpty { return true }
+        if let windowTitle, !windowTitle.isEmpty, windowTitle != appName { return true }
+        return false
+    }
+
     var modelContextBlock: String? {
         var lines: [String] = []
         lines.append(AppFlavor.text("应用：\(appName)", "App: \(appName)"))
