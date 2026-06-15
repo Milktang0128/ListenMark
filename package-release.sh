@@ -3,8 +3,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-VERSION="${VERSION:-0.3.1}"
-BUILD="${BUILD:-31}"
+VERSION="${VERSION:-0.3.2}"
+BUILD="${BUILD:-32}"
 ARCH="${ARCH:-arm64}"
 IDENTITY="${CODESIGN_IDENTITY:-Developer ID Application: Zhi Tang (LB8ZBRDP63)}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-myskills-notary}"
