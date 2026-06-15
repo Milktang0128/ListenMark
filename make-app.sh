@@ -7,8 +7,8 @@ cd "$(dirname "$0")"
 swift build -c release
 
 FLAVOR="${FLAVOR:-zh}"
-VERSION="${VERSION:-0.3.2}"
-BUILD="${BUILD:-32}"
+VERSION="${VERSION:-0.3.3}"
+BUILD="${BUILD:-33}"
 if [ "$FLAVOR" = "en" ] || [ "$FLAVOR" = "international" ]; then
   APP="Dob International.app"
   BUNDLE_NAME="Dob International"

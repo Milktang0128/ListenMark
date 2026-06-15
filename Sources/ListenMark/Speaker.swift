@@ -4,6 +4,7 @@ enum SpeechPlaybackStatus: Equatable {
     case idle
     case preparing(String)
     case playing(String)
+    case paused(String)
 }
 
 /// Voice-first output with streaming support.
@@ -30,6 +31,7 @@ final class Speaker: NSObject, ObservableObject, AVAudioPlayerDelegate {
     private var activeCacheText: String?
     private var activeGeneratedChunks: [Data] = []
     private var onFinishPlay: (() -> Void)?
+    private var speechFinishTimer: Timer?
 
     private var cloudProvider: CloudTTSProvider? { CloudTTS.currentProvider() }
 
@@ -90,12 +92,46 @@ final class Speaker: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     func endStream() { streaming = false }
 
-    // MARK: Stop
+    // MARK: Playback Controls
+
+    func pause() {
+        guard case .playing(let provider) = status else { return }
+
+        if let player {
+            player.pause()
+            setStatus(.paused(provider))
+            return
+        }
+
+        if synth.isSpeaking && !synth.isPaused {
+            synth.pauseSpeaking(at: .immediate)
+            setStatus(.paused(provider))
+        }
+    }
+
+    func resume() {
+        guard case .paused(let provider) = status else { return }
+
+        if let player {
+            player.play()
+            setStatus(.playing(provider))
+            return
+        }
+
+        if synth.isPaused {
+            synth.continueSpeaking()
+            setStatus(.playing(provider))
+            monitorLocalSpeechCompletion()
+            return
+        }
+
+        setStatus(.idle)
+    }
 
     func stop() {
         playbackGeneration += 1
         streaming = false
-        if synth.isSpeaking { synth.stopSpeaking(at: .immediate) }
+        if synth.isSpeaking || synth.isPaused { synth.stopSpeaking(at: .immediate) }
         player?.stop(); player = nil
         cloudQueue.removeAll()
         cloudDraining = false
@@ -103,6 +139,8 @@ final class Speaker: NSObject, ObservableObject, AVAudioPlayerDelegate {
         activeCacheText = nil
         activeGeneratedChunks = []
         onFinishPlay = nil
+        speechFinishTimer?.invalidate()
+        speechFinishTimer = nil
         setStatus(.idle)
     }
 
@@ -118,6 +156,7 @@ final class Speaker: NSObject, ObservableObject, AVAudioPlayerDelegate {
     private func localSpeak(_ t: String) {
         setStatus(.playing(AppFlavor.text("macOS 本地语音", "macOS Speech")))
         synth.speak(utterance(for: t))
+        monitorLocalSpeechCompletion()
     }
 
     private func nextPlaybackGeneration() -> Int {
@@ -181,6 +220,7 @@ final class Speaker: NSObject, ObservableObject, AVAudioPlayerDelegate {
                     let remaining = ([next] + self.cloudQueue).joined(separator: "\n")
                     self.cloudQueue.removeAll()
                     self.cloudDraining = false
+                    self.activeCloudProvider = nil
                     self.lastGeneratedAudio = nil
                     self.localSpeak(remaining)
                 }
@@ -215,9 +255,38 @@ final class Speaker: NSObject, ObservableObject, AVAudioPlayerDelegate {
     }
 
     func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        if self.player === player {
+            self.player = nil
+        }
         let done = onFinishPlay
         onFinishPlay = nil
         done?()
+    }
+
+    private func monitorLocalSpeechCompletion() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.speechFinishTimer?.invalidate()
+            self.speechFinishTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] timer in
+                guard let self else {
+                    timer.invalidate()
+                    return
+                }
+                guard self.canMarkLocalSpeechIdle else { return }
+                timer.invalidate()
+                self.speechFinishTimer = nil
+                self.setStatus(.idle)
+            }
+        }
+    }
+
+    private var canMarkLocalSpeechIdle: Bool {
+        !synth.isSpeaking &&
+        !synth.isPaused &&
+        player == nil &&
+        activeCloudProvider == nil &&
+        !cloudDraining &&
+        cloudQueue.isEmpty
     }
 
     private func setStatus(_ status: SpeechPlaybackStatus) {
@@ -228,5 +297,27 @@ final class Speaker: NSObject, ObservableObject, AVAudioPlayerDelegate {
                 self?.status = status
             }
         }
+    }
+}
+
+extension Speaker {
+    var isIdle: Bool {
+        if case .idle = status { return true }
+        return false
+    }
+
+    var isPreparing: Bool {
+        if case .preparing = status { return true }
+        return false
+    }
+
+    var isPlaying: Bool {
+        if case .playing = status { return true }
+        return false
+    }
+
+    var isPaused: Bool {
+        if case .paused = status { return true }
+        return false
     }
 }

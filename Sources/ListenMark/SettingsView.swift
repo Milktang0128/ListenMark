@@ -32,6 +32,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
 
 struct SettingsView: View {
     @State private var page: SettingsPage
+    @State private var loadedPages: Set<SettingsPage>
     @AppStorage("autoPop") private var autoPop = true
     @AppStorage("autoPopCopyFallback") private var autoPopCopyFallback = true
     @AppStorage("autoDismissPanel") private var autoDismissPanel = true
@@ -51,6 +52,7 @@ struct SettingsView: View {
 
     init(initialPage: SettingsPage = .preferences) {
         _page = State(initialValue: initialPage)
+        _loadedPages = State(initialValue: [initialPage])
     }
 
     var body: some View {
@@ -74,17 +76,13 @@ struct SettingsView: View {
                 .padding(.bottom, 6)
             ForEach(SettingsPage.allCases) { item in
                 Button {
-                    page = item
+                    selectPage(item)
                 } label: {
-                    Label(item.title, systemImage: item.icon)
-                        .font(.system(size: 13, weight: page == item ? .semibold : .regular))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
-                        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(page == item ? Color.accentColor.opacity(0.14) : Color.clear))
-                        .foregroundStyle(page == item ? Color.accentColor : Color.primary)
+                    sidebarRow(item)
                 }
                 .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
+                .contentShape(Rectangle())
             }
             Spacer()
         }
@@ -92,8 +90,47 @@ struct SettingsView: View {
         .background(.bar)
     }
 
-    @ViewBuilder private var content: some View {
-        switch page {
+    private func sidebarRow(_ item: SettingsPage) -> some View {
+        Label(item.title, systemImage: item.icon)
+            .font(.system(size: 13, weight: page == item ? .semibold : .regular))
+            .frame(maxWidth: .infinity, minHeight: 38, alignment: .leading)
+            .padding(.horizontal, 10)
+            .background {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(page == item ? Color.accentColor.opacity(0.14) : Color.clear)
+            }
+            .foregroundStyle(page == item ? Color.accentColor : Color.primary)
+            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private func selectPage(_ item: SettingsPage) {
+        guard item != page else { return }
+        var transaction = Transaction()
+        transaction.animation = nil
+        withTransaction(transaction) {
+            loadedPages.insert(item)
+            page = item
+        }
+    }
+
+    private var content: some View {
+        ZStack {
+            ForEach(SettingsPage.allCases) { item in
+                if loadedPages.contains(item) {
+                    pageContent(item)
+                        .opacity(page == item ? 1 : 0)
+                        .allowsHitTesting(page == item)
+                        .accessibilityHidden(page != item)
+                }
+            }
+        }
+        .transaction { transaction in
+            transaction.animation = nil
+        }
+    }
+
+    @ViewBuilder private func pageContent(_ item: SettingsPage) -> some View {
+        switch item {
         case .preferences:
             preferencesPane
         case .services:

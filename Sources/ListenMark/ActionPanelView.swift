@@ -448,11 +448,7 @@ struct ActionPanelView: View {
     private func controls(text: String, replay: Bool, archived: Bool) -> some View {
         HStack(spacing: 7) {
             if replay {
-                Button { model.onReplay?() } label: {
-                    Image(systemName: "play.fill")
-                }
-                .buttonStyle(.borderedProminent)
-                .help(AppFlavor.text("重听", "Replay"))
+                playbackButton
             }
             Button { model.onStop?() } label: { Image(systemName: "stop.fill") }
                 .buttonStyle(.bordered)
@@ -491,6 +487,41 @@ struct ActionPanelView: View {
         }
         .controlSize(.small)
         .buttonBorderShape(.capsule)
+    }
+
+    private var playbackButton: some View {
+        Button {
+            handlePlaybackButton()
+        } label: {
+            Image(systemName: playbackButtonIcon)
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(speaker.isPreparing)
+        .help(playbackButtonHelp)
+    }
+
+    private func handlePlaybackButton() {
+        if speaker.isPlaying {
+            Speaker.shared.pause()
+        } else if speaker.isPaused {
+            Speaker.shared.resume()
+        } else if !speaker.isPreparing {
+            model.onReplay?()
+        }
+    }
+
+    private var playbackButtonIcon: String {
+        if speaker.isPlaying { return "pause.fill" }
+        if speaker.isPaused { return "play.fill" }
+        if speaker.isPreparing { return "hourglass" }
+        return "play.fill"
+    }
+
+    private var playbackButtonHelp: String {
+        if speaker.isPlaying { return AppFlavor.text("暂停", "Pause") }
+        if speaker.isPaused { return AppFlavor.text("继续", "Resume") }
+        if speaker.isPreparing { return AppFlavor.text("正在生成语音，可用停止取消", "Preparing speech. Use Stop to cancel.") }
+        return AppFlavor.text("从头重听", "Replay from Start")
     }
 
     private func compareControls(text: String, archived: Bool) -> some View {
