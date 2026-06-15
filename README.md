@@ -22,22 +22,7 @@
 
 它不是一个完整替代大模型聊天窗口的产品，而是一个贴在系统文本选择旁边的读写工具：你在浏览、写作、阅读 PDF、微信内置浏览器或任何应用里遇到重要内容时，不需要切换窗口，就能让 AI 帮你处理当前这段话。
 
-## 品牌识别
-
-Dob 的中文定位是 **「过耳不忘的 AI 读写工具」**。
-
-新的图标以字母 **D** 为主体，中间留出耳朵轮廓。它对应的是 Dob 的核心产品哲学：信息不是只被“处理”一下，而是要经过你的听觉、理解和复习，最终变成可回看的本地记忆。
-
-中文名「过耳不忘」现在是品牌定位语，不再作为独立 App 名。中文版和国际版的可见 App 名分别是：
-
-| 版本 | App 名 | 面向用户 | Release 通道 |
-|---|---|---|---|
-| 中文版 | Dob | 中文读写、中文默认提示词、中文语音优先 | `v...` |
-| 国际版 | Dob International | 英文界面、英文默认提示词、英文使用习惯 | `listenmark-v...` |
-
-0.3.x 是品牌桥接版本：安装包、界面和 GitHub 仓库已经转向 Dob；底层 bundle id、设置域和数据目录暂时保留旧值，以保证老用户的自动更新、辅助功能权限、API Key、快捷键、档案和历史记录连续。
-
-## 下载
+## 下载与安装
 
 已签名和公证的安装包发布在 GitHub Releases：
 
@@ -48,7 +33,16 @@ Dob 的中文定位是 **「过耳不忘的 AI 读写工具」**。
 | 中文版 | `Dob-...-arm64.dmg` | 推荐大多数中文用户安装 |
 | 国际版 | `Dob-International-...-arm64.dmg` | 英文界面和英文默认工作流 |
 
-安装包已使用 Developer ID 签名、公证并 staple。App 会检查当前发行通道的 GitHub Releases，中文和国际版不会互相串线。
+安装包已签名并通过 Apple 公证。Dob 会自动检查对应版本的更新，中文版和国际版不会互相更新。
+
+首次使用：
+
+1. 下载 DMG，打开后把 **Dob** 拖到 Applications。
+2. 打开 Dob 后授予 **辅助功能** 权限：系统设置 -> 隐私与安全性 -> 辅助功能 -> 打开「Dob」。
+3. 菜单栏图标 -> **服务管理...**，在「文本处理」里填写 API Key。默认模型预填 DeepSeek 推荐配置，也可以换成任何 OpenAI 兼容接口。
+4. 选中任意应用里的文字，等待浮窗弹出，或按 `Option + Command + R` 手动呼出工具条。
+
+没有 API Key 时，仍可使用朗读、OCR、复制、留档、历史和档案。AI 技能需要 OpenAI 兼容 Chat Completions API。
 
 ## 它能做什么
 
@@ -157,28 +151,7 @@ Dob 把「主动留档」和「静默历史」分开：
 | 主动留档 | 长期复习和今日回响 | 原文、结果、来源、时间、动作、轻量上下文摘录 |
 | 静默历史 | 临时回看最近动作 | 最近 500 条原文、结果、动作和来源，不保存全文上下文 |
 
-Markdown 留档可选择到自己的目录，例如 Obsidian vault。默认数据目录在 0.3.x 桥接期仍为：
-
-```text
-~/Library/Application Support/ListenMark/
-```
-
-主要文件：
-
-```text
-archive.json
-history.json
-Dob.md
-```
-
-## 首次启用
-
-1. 打开 Dob 后授予 **辅助功能** 权限：系统设置 -> 隐私与安全性 -> 辅助功能 -> 打开「Dob」。
-2. 菜单栏图标 -> **服务管理...**。
-3. 在「文本处理」里填写 API Key。默认模型预填 DeepSeek 推荐配置，也可以换成任何 OpenAI 兼容接口。
-4. 选中任意应用里的文字，等待浮窗弹出，或按 `Option + Command + R` 手动呼出工具条。
-
-没有 API Key 时，仍可使用朗读、OCR、复制、留档、历史和档案。AI 技能需要 OpenAI 兼容 Chat Completions API。
+Markdown 留档可选择到自己的目录，例如 Obsidian vault。设置页可以直接选择位置、在访达中显示，或恢复默认位置。
 
 ## 常用快捷键
 
@@ -204,10 +177,8 @@ Dob.md
 - 英文界面和英文默认技能名称。
 - 默认本地 macOS 语音，降低首次使用门槛。
 - 翻译默认目标是自然英文；如果原文已经是英文，则改写成更清晰自然的英文。
-- 0.3.x 桥接版仍使用 `listenmark-v...` prerelease 通道，保证旧国际版可自动升级。
-- 数据目录暂时仍为 `~/Library/Application Support/ListenMark International/`。
 
-## 构建
+## 开发者构建
 
 构建中文版：
 
@@ -234,20 +205,6 @@ swift run
 ```bash
 ./package-release.sh
 ```
-
-## 代码结构
-
-内部 SwiftPM target 暂时仍叫 `ListenMark`，这是 0.3.x 桥接版为了降低迁移风险保留的技术名；用户可见品牌已经统一为 Dob。
-
-| 路径 | 职责 |
-|---|---|
-| `Sources/ListenMark/AppFlavor.swift` | 中文 / 国际版 flavor、名称、发行通道 |
-| `Sources/ListenMark/AppDelegate.swift` | 菜单栏、触发编排、窗口和动作流 |
-| `Sources/ListenMark/ActionPanel.swift` / `ActionPanelView.swift` | 光标旁浮动动作面板、输入面板、比较结果 |
-| `Sources/ListenMark/ActionStore.swift` | 内置技能、自定义技能、排序、快捷键、提示词 |
-| `Sources/ListenMark/ServicesView.swift` | 服务管理：默认模型、比较模型、OCR 和语音合成 |
-| `Sources/ListenMark/ArchiveStore.swift` / `HistoryStore.swift` | 主动留档、Markdown 输出和静默历史 |
-| `Sources/ListenMark/GitHubReleaseUpdater.swift` | GitHub Releases 自动更新 |
 
 ## 已知边界
 

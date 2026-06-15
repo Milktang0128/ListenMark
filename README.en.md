@@ -22,20 +22,7 @@
 
 Dob is not trying to replace a full chat app. It is a small reading and writing tool that stays next to the text you are already working with.
 
-## Brand
-
-Dob's Chinese positioning line is **过耳不忘的 AI 读写工具**. The idea is simple: important information should not merely be processed by AI; it should pass through your perception, understanding, and review loop, then stay available on your own computer.
-
-The new app icon uses a black **D** shape with an ear-like inner cutout. It connects the product name with the act of listening, reading, and remembering.
-
-| Edition | App name | Audience | Release channel |
-|---|---|---|---|
-| Chinese | Dob | Chinese reading and writing defaults | `v...` |
-| International | Dob International | English interface and English-first defaults | `listenmark-v...` |
-
-0.3.x is a bridge release: user-facing branding and installers move to Dob, while legacy bundle identifiers, defaults domains, and support folders are kept so existing users retain automatic updates, Accessibility permission, API keys, hotkeys, archives, and history.
-
-## Download
+## Download and Install
 
 Signed and notarized installers are published on GitHub Releases:
 
@@ -46,7 +33,16 @@ Signed and notarized installers are published on GitHub Releases:
 | Chinese | `Dob-...-arm64.dmg` | Recommended for Chinese users |
 | International | `Dob-International-...-arm64.dmg` | English UI and English-first workflows |
 
-Automatic updates follow the matching release channel. The Chinese and international editions do not cross-update.
+Installers are signed and notarized by Apple. The Chinese and international editions update separately.
+
+Quick start:
+
+1. Download the DMG, open it, and drag **Dob International** to Applications.
+2. Open Dob International and grant Accessibility permission when macOS asks.
+3. Open **Services...** from the menu bar item, then add an OpenAI-compatible API key. DeepSeek is prefilled as the recommended default provider.
+4. Select text in any app, wait for the panel, or press `Option + Command + R`.
+
+Without an API key, Read, OCR, copy, archive, history, and local review still work. AI actions require an OpenAI-compatible Chat Completions API.
 
 ## What Dob Does
 
@@ -149,26 +145,7 @@ Dob separates deliberate Archive from Silent History:
 | Archive | Long-term review | Source text, result, app, time, action, and lightweight context excerpt |
 | Silent History | Temporary lookup | Latest 500 source/result/action/source records, without full-text context |
 
-You can choose a custom Markdown archive folder, including an Obsidian vault. In the 0.3.x bridge release, the international edition keeps the legacy support folder:
-
-```text
-~/Library/Application Support/ListenMark International/
-```
-
-The readable Markdown archive is:
-
-```text
-Dob International.md
-```
-
-## Quick Start
-
-1. Open Dob International and grant Accessibility permission when macOS asks.
-2. Open Services from the menu bar item.
-3. Add an OpenAI-compatible API key for AI actions. DeepSeek is prefilled as the recommended default provider.
-4. Select text in any app, wait for the panel, or press `Option + Command + R`.
-
-Without an API key, Read, OCR, copy, archive, history, and local review still work. AI actions require an OpenAI-compatible Chat Completions API.
+You can choose a custom Markdown archive folder, including an Obsidian vault. Settings can also reveal the archive folder in Finder or restore the default location.
 
 ## Default Hotkeys
 
