@@ -66,6 +66,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                                                name: .gebwOpenServices, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(openHistory),
                                                name: .gebwOpenHistory, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(languageChanged),
+                                               name: .gebwLanguageChanged, object: nil)
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(appActivated(_:)),
                                                           name: NSWorkspace.didActivateApplicationNotification, object: nil)
         if let app = NSWorkspace.shared.frontmostApplication, !isBuiltInAutoPopProtected(app) {
@@ -389,15 +391,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // MARK: - Status item
 
     private func setupStatusItem() {
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        if let btn = statusItem.button {
-            if let image = NSImage(named: "DobStatusIcon") {
-                image.size = NSSize(width: 18, height: 18)
-                image.isTemplate = true
-                btn.image = image
-            } else {
-                btn.image = NSImage(systemSymbolName: "ear", accessibilityDescription: AppFlavor.appName)
-                btn.image?.isTemplate = true
+        if statusItem == nil {
+            statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+            if let btn = statusItem.button {
+                if let image = NSImage(named: "DobStatusIcon") {
+                    image.size = NSSize(width: 18, height: 18)
+                    image.isTemplate = true
+                    btn.image = image
+                } else {
+                    btn.image = NSImage(systemSymbolName: "ear", accessibilityDescription: AppFlavor.appName)
+                    btn.image?.isTemplate = true
+                }
             }
         }
         let menu = NSMenu()
@@ -427,6 +431,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(NSMenuItem(title: AppFlavor.text("退出 \(AppFlavor.appName)", "Quit \(AppFlavor.appName)"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         menu.delegate = self
         statusItem.menu = menu
+    }
+
+    @objc private func languageChanged() {
+        setupMainMenu()
+        setupStatusItem()                    // idempotent — rebuilds the menu in the new language
+        ActionStore.shared.relocalizeBuiltins()
     }
 
     // Refresh the 今日回响 due-count badge each time the menu opens (passive nudge).

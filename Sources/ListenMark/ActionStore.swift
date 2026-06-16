@@ -207,6 +207,16 @@ final class ActionStore: ObservableObject {
         save()
     }
 
+    /// Re-label built-in actions in the current UI language (custom actions and
+    /// user-edited prompts are left untouched).
+    func relocalizeBuiltins() {
+        let names = Dictionary(uniqueKeysWithValues: ActionStore.builtins.map { ($0.id, $0.name) })
+        for i in actions.indices where actions[i].isBuiltin {
+            if let name = names[actions[i].id] { actions[i].name = name }
+        }
+        save()
+    }
+
     func resetToDefaults() {
         actions = ActionStore.builtins
         save()

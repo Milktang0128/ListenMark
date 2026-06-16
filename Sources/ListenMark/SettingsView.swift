@@ -187,6 +187,9 @@ struct SettingsView: View {
                     Text("English").tag("en")
                 }
                 .labelsHidden().pickerStyle(.menu).fixedSize()
+                .onChange(of: appLanguage) { _, _ in
+                    NotificationCenter.default.post(name: .gebwLanguageChanged, object: nil)
+                }
             }
         }
     }
