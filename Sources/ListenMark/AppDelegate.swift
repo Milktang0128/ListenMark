@@ -25,6 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var lastAutoCopyFallbackAt = Date.distantPast
 
     private var archiveWindow: NSWindow?
+    private var onboardingWindow: NSWindow?
     private var historyWindow: NSWindow?
     private var settingsWindow: NSWindow?
     private var servicesWindow: NSWindow?
@@ -70,7 +71,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if let app = NSWorkspace.shared.frontmostApplication, !isBuiltInAutoPopProtected(app) {
             enableAX(app.processIdentifier)
         }
-        checkTrust()
+        if Settings.onboardingCompletedBuild == 0 {
+            openOnboarding()
+        } else {
+            checkTrust()
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             GitHubReleaseUpdater.shared.checkAutomaticallyIfNeeded()
         }
@@ -1297,6 +1302,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func openAbout() {
         showWindow(&aboutWindow, size: NSSize(width: 360, height: 300), title: AppFlavor.text("关于 \(AppFlavor.appName)", "About \(AppFlavor.appName)")) { AboutView() }
+    }
+
+    @objc private func openOnboarding() {
+        let model = OnboardingModel(
+            onOpenAX: { [weak self] in self?.openAXPrefs() },
+            onOpenServices: { [weak self] in self?.openServices() },
+            onTrustGranted: { [weak self] in
+                guard let self else { return }
+                self.applyConfig()   // re-arm capture once Accessibility is granted — no restart
+                if let app = NSWorkspace.shared.frontmostApplication { self.enableAX(app.processIdentifier) }
+            },
+            onFinish: { [weak self] in
+                self?.onboardingWindow?.close()
+                self?.onboardingWindow = nil
+            }
+        )
+        showWindow(&onboardingWindow, size: NSSize(width: 520, height: 560),
+                   title: AppFlavor.text("欢迎使用 \(AppFlavor.appName)", "Welcome to \(AppFlavor.appName)")) {
+            OnboardingView(model: model)
+        }
     }
 
     @objc private func openAXPrefs() {

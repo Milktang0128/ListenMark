@@ -10,6 +10,22 @@ enum Settings {
     private static let llmServiceProvidersKey = "llmServiceProviders"
     private static let actionLLMProviderOverridesKey = "actionLLMProviderOverrides"
 
+    // MARK: Onboarding
+
+    /// 0 = onboarding never completed. Otherwise stores the CFBundleVersion at
+    /// completion (so future builds can show a "what's new" without re-onboarding).
+    static var onboardingCompletedBuild: Int {
+        get { d.integer(forKey: "onboardingCompletedBuild") }
+        set { d.set(newValue, forKey: "onboardingCompletedBuild") }
+    }
+
+    /// One-time prompt offering to put the Markdown archive into Obsidian, shown
+    /// at the user's first successful archive (not during onboarding).
+    static var obsidianHintShown: Bool {
+        get { d.bool(forKey: "obsidianHintShown") }
+        set { d.set(newValue, forKey: "obsidianHintShown") }
+    }
+
     // MARK: Text actions — OpenAI-compatible chat completions
 
     static let recommendedLLMBaseURL = "https://api.deepseek.com"
