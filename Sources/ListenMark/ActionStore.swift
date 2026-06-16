@@ -16,7 +16,7 @@ final class ActionStore: ObservableObject {
     private let backgroundDefaultOffKey = "actionsConfig.backgroundDefaultOff.v1"
 
     private static var optimizedPrompts: [String: String] {
-        if AppFlavor.isInternational {
+        if AppFlavor.uiLanguageIsEnglish {
             return [
                 "explain": "Explain the selected text in clear, natural English. Start with one sentence that states the core meaning, then add the key terms, implied background, or sentence relationships needed to understand it. Keep it concise, three to five spoken sentences, and do not simply paraphrase the original.",
                 "translate": "Translate the selected text into natural English. If it is already English, rewrite it in clearer natural English while preserving meaning, tone, names, product names, and technical terms. Use any provided full-text context only to resolve references and terminology. Output only the translation or rewrite, with no explanation or prefix.",

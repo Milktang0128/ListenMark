@@ -47,6 +47,7 @@ struct SettingsView: View {
     @AppStorage("autoArchive") private var autoArchive = false
     @AppStorage("historyEnabled") private var historyEnabled = true
     @AppStorage("archiveFolder") private var archiveFolder = ""
+    @AppStorage("appLanguage") private var appLanguage = "system"
 
     @State private var disabledAppsRevision = 0
 
@@ -156,12 +157,37 @@ struct SettingsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 header
+                generalSection
                 captureSection
                 fallbackSection
                 behaviorSection
             }
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .id(appLanguage)   // re-render in the new language the moment it changes
+    }
+
+    private var generalSection: some View {
+        SettingsSection(title: AppFlavor.text("通用", "General"),
+                        subtitle: AppFlavor.text("界面语言同时决定翻译技能的目标语言。",
+                                                 "Interface language also sets the Translate skill's target language.")) {
+            HStack {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(AppFlavor.text("语言", "Language"))
+                        .font(.system(size: 13, weight: .medium))
+                    Text(AppFlavor.text("「跟随系统」按你的 macOS 语言自动选择中 / 英。",
+                                        "“System” follows your macOS language (Chinese / English)."))
+                        .font(.system(size: 11)).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Picker("", selection: $appLanguage) {
+                    Text(AppFlavor.text("跟随系统", "System")).tag("system")
+                    Text("中文").tag("zh")
+                    Text("English").tag("en")
+                }
+                .labelsHidden().pickerStyle(.menu).fixedSize()
+            }
         }
     }
 

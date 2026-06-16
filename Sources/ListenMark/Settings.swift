@@ -26,6 +26,14 @@ enum Settings {
         set { d.set(newValue, forKey: "obsidianHintShown") }
     }
 
+    // MARK: General
+
+    /// UI language: "system" | "zh" | "en". Also drives the translate target.
+    static var appLanguage: String {
+        get { d.string(forKey: "appLanguage") ?? "system" }
+        set { d.set(newValue, forKey: "appLanguage") }
+    }
+
     // MARK: Text actions — OpenAI-compatible chat completions
 
     static let recommendedLLMBaseURL = "https://api.deepseek.com"
