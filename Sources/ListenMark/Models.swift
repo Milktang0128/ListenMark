@@ -45,10 +45,25 @@ struct Entry: Identifiable, Codable {
     var comparison: ComparisonRecord? = nil
     var contextUsed: Bool?
     var contextExcerpt: String?
+    // Multi-turn conversation (nil for single-shot entries; back-compatible).
+    var conversationTurns: [ConversationTurn]? = nil
     // Spaced-repetition state (optional → back-compatible with old archives).
     var reviewCount: Int?
     var lastReviewed: Date?
     var mastered: Bool?
+}
+
+/// One turn in a multi-turn conversation (the 对话 skill and global follow-up).
+/// `languageIsEnglish` is captured when the turn is created so old turns keep
+/// rendering with the labels they were written in even if the UI language flips.
+struct ConversationTurn: Codable, Equatable, Identifiable {
+    enum Role: String, Codable { case user, assistant }
+    var id: UUID = UUID()
+    var role: Role
+    var text: String
+    var date: Date = Date()
+    var model: String? = nil
+    var languageIsEnglish: Bool = false
 }
 
 /// Silent recent-history item. This deliberately omits full-text context so it

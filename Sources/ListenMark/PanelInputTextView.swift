@@ -4,6 +4,8 @@ import SwiftUI
 struct PanelInputTextView: NSViewRepresentable {
     @Binding var text: String
     var focusRequest: Int
+    var onSubmit: (() -> Void)? = nil
+    var onCancel: (() -> Void)? = nil
 
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
@@ -80,6 +82,24 @@ struct PanelInputTextView: NSViewRepresentable {
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
             parent.text = textView.string
+        }
+
+        /// Return submits (when an onSubmit is wired); Shift+Return inserts a
+        /// newline; Esc cancels. With no handlers wired, behaviour is unchanged.
+        func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+            switch commandSelector {
+            case #selector(NSResponder.insertNewline(_:)):
+                guard let onSubmit = parent.onSubmit else { return false }
+                if NSApp.currentEvent?.modifierFlags.contains(.shift) == true { return false }
+                onSubmit()
+                return true
+            case #selector(NSResponder.cancelOperation(_:)):
+                guard let onCancel = parent.onCancel else { return false }
+                onCancel()
+                return true
+            default:
+                return false
+            }
         }
 
         func requestFocus(attemptsRemaining: Int = 8) {

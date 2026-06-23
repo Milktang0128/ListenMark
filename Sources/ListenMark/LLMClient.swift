@@ -71,6 +71,16 @@ enum LLMClient {
     }
 
     static func stream(prompt: String, text: String, provider: LLMProviderConfig) -> AsyncThrowingStream<String, Error> {
+        stream(messages: [
+            ["role": "system", "content": systemContent(prompt)],
+            ["role": "user", "content": text]
+        ], provider: provider)
+    }
+
+    /// Multi-turn streaming. The caller owns the full messages array; the
+    /// plain-text / no-Markdown rule must already be folded into the system
+    /// message via `systemContent(_:)` (so it is injected exactly once).
+    static func stream(messages: [[String: String]], provider: LLMProviderConfig) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
@@ -82,7 +92,11 @@ enum LLMClient {
                     req.httpMethod = "POST"
                     req.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
                     req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                    req.httpBody = try JSONSerialization.data(withJSONObject: requestBody(prompt: prompt, text: text, stream: true, model: provider.model))
+                    req.httpBody = try JSONSerialization.data(withJSONObject: [
+                        "model": provider.model,
+                        "messages": messages,
+                        "stream": true
+                    ])
 
                     let (bytes, resp) = try await URLSession.shared.bytes(for: req)
                     guard let http = resp as? HTTPURLResponse else { throw LLMError.badResponse }
@@ -107,6 +121,11 @@ enum LLMClient {
             }
             continuation.onTermination = { _ in task.cancel() }
         }
+    }
+
+    /// System message content = base prompt + the plain-text / no-Markdown rule.
+    static func systemContent(_ basePrompt: String) -> String {
+        basePrompt + "\n\n" + plainTextRule
     }
 
     /// Appended to every action prompt: the answer is read aloud by TTS, so it
