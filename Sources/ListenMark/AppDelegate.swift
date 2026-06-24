@@ -36,7 +36,10 @@ private struct PreservedSession {
     var conversationAtTurnLimit: Bool
     var contentWidth: CGFloat
 
-    var frameOrigin: NSPoint
+    // Top-left of the panel at hide time. The panel grows DOWNWARD from a fixed
+    // top edge, so restore must anchor maxY here — `frameOrigin` (bottom-left)
+    // would drift once the restored height differs from the height at hide time.
+    var frameTopLeft: NSPoint
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
@@ -882,7 +885,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             followUpText: panel.model.followUpText,
             conversationAtTurnLimit: panel.model.conversationAtTurnLimit,
             contentWidth: panel.model.contentWidth,
-            frameOrigin: panel.frame.origin
+            frameTopLeft: NSPoint(x: panel.frame.minX, y: panel.frame.maxY)
         )
 
         panelIsFadingOut = false
@@ -935,7 +938,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         panelIsFadingOut = false
         panel.alphaValue = 1
-        panel.setFrameOrigin(s.frameOrigin)
+        // Pin the panel's TOP edge to where it was hidden. `reapplyLayout` (below)
+        // anchors the resized frame to the current `maxY` and grows downward, so
+        // pre-seating maxY at the captured top-left.y makes the restored panel
+        // reappear at the exact spot — at its full restored height — instead of
+        // jumping toward the menu bar off a stale frame height.
+        panel.anchorTopLeft(s.frameTopLeft)
         panel.requestKeyboardFocus()
         panel.orderFrontRegardless()
 

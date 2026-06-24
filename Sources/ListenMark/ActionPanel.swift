@@ -125,6 +125,18 @@ final class ActionPanel: NSPanel {
         resize(for: model.phase)
     }
 
+    /// Pin the panel so its TOP-LEFT corner sits at `topLeft`, keeping the current
+    /// height. `restorePanel` calls this before `reapplyLayout`, which anchors the
+    /// resized frame to the current `maxY` and grows downward — so seating `maxY`
+    /// at the captured top.y makes the restored panel reappear exactly where it
+    /// was hidden, regardless of how its height changed in the meantime.
+    func anchorTopLeft(_ topLeft: NSPoint) {
+        var f = frame
+        f.origin.x = topLeft.x
+        f.origin.y = topLeft.y - f.height
+        setFrameOrigin(f.origin)
+    }
+
     private func resize(for phase: PanelModel.Phase) {
         let w = width(for: phase)
         let h = height(for: phase)
