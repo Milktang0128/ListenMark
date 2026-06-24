@@ -917,7 +917,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         panel.model.pinned = false
         panel.model.contentWidth = s.contentWidth
-        panel.model.disableAppName = currentDisableCandidate()?.appName
         syncHistoryButtons()
 
         panelIsFadingOut = false
@@ -1014,9 +1013,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         panel.model.conversationAtTurnLimit = s.conversationAtTurnLimit
         panel.model.selectedCompareID = s.selectedCompareID
         panel.model.isAwaitingReply = false
+        // Recompute from the restored source so the "··· › disable auto-pop" item
+        // names the right app after a back/forward step.
+        panel.model.disableAppName = currentDisableCandidate()?.appName
 
-        if conversation != nil {
+        if let state = conversation {
             syncConversationToPanel()
+            // The operation was snapshotted between submitting a follow-up and the
+            // first reply delta, so its last turn is an unanswered user turn. There
+            // is no live stream after a restore, so resume generation instead of
+            // leaving a permanent "responding" spinner.
+            if state.turns.last?.role == .user {
+                runConversationStream()
+            }
         } else {
             panel.model.phase = s.phase
         }
