@@ -74,12 +74,18 @@ enum ActionResultLayout {
 
     /// Panel height while a conversation is on screen: the regular result card
     /// plus the history viewport and the follow-up bar.
+    /// Height of the inline "正在回答…" placeholder bubble (bubble v-padding +
+    /// spacing) reserved while a follow-up answer hasn't started streaming.
+    static let awaitingReplyBubbleHeight: CGFloat = 34
+
     static func conversationPanelHeight(priorTurns: [ConversationTurn], currentText: String,
-                                        panelWidth: CGFloat, barHeight: CGFloat) -> CGFloat {
+                                        panelWidth: CGFloat, barHeight: CGFloat,
+                                        awaitingReply: Bool = false) -> CGFloat {
         let history = conversationViewportHeight(for: priorTurns, panelWidth: panelWidth)
         let historyBlock = history > 0 ? history + 8 : 0   // + gap below the history area
+        let awaitingBlock = awaitingReply ? awaitingReplyBubbleHeight + 9 : 0
         return panelHeight(for: currentText, panelWidth: panelWidth, barHeight: barHeight)
-            + historyBlock + followUpBarHeight + 8
+            + historyBlock + awaitingBlock + followUpBarHeight + 8
     }
 
     /// Worst-case conversation panel height — used to reserve drop-down headroom.
@@ -172,6 +178,7 @@ final class PanelModel: ObservableObject {
     @Published var isConversing: Bool = false            // drives guards + hides Compare
     @Published var conversationAtTurnLimit: Bool = false // disables the follow-up bar when hit
     @Published var canFollowUp: Bool = false             // a needsLLM result shows the follow-up bar
+    @Published var isAwaitingReply: Bool = false         // user turn submitted, assistant answer not yet streaming
     @Published var dialogueInstruction: String = ""      // 对话 turn-0 instruction; NEVER synced to currentText
     var onFollowUpSubmit: ((String) -> Void)?
     var onExitConversation: (() -> Void)?
@@ -385,7 +392,7 @@ struct ActionPanelView: View {
 
         case .dialogueInput(let selectedText):
             VStack(alignment: .leading, spacing: 8) {
-                Label(AppFlavor.text("对这段内容说点什么", "Tell the AI what to do"), systemImage: "bubble.left.and.text.bubble.right")
+                Label(AppFlavor.text("基于这段内容展开对话", "Start a conversation about this"), systemImage: "bubble.left.and.text.bubble.right")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.secondary)
 
@@ -396,7 +403,7 @@ struct ActionPanelView: View {
                                        onCancel: { model.onDialogueCancel?() })
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     if model.dialogueInstruction.isEmpty {
-                        Text(AppFlavor.text("对这段内容说点什么…例如「换个说法」「举个例子」", "Tell the AI what to do with this…"))
+                        Text(AppFlavor.text("基于这段内容展开对话…例如「换个说法」「举个例子」", "Start a conversation about this… e.g. 'rephrase', 'give an example'"))
                             .font(.system(size: 13))
                             .foregroundStyle(.tertiary)
                             .padding(.top, 1)
@@ -502,6 +509,10 @@ struct ActionPanelView: View {
 
                 if !model.priorTurns.isEmpty {
                     conversationHistoryView
+                }
+
+                if model.isAwaitingReply {
+                    awaitingReplyBubble
                 }
 
                 if !compact {
@@ -727,11 +738,32 @@ struct ActionPanelView: View {
         }
     }
 
+    /// Left-aligned assistant placeholder shown after a follow-up is submitted but
+    /// before the answer starts streaming, so the user sees a "responding" state.
+    private var awaitingReplyBubble: some View {
+        HStack(spacing: 0) {
+            HStack(spacing: 7) {
+                ProgressView().controlSize(.small)
+                Text(AppFlavor.text("正在回答…", "Responding…"))
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 9)
+                    .fill(Color.primary.opacity(0.045))
+            )
+            Spacer(minLength: 24)
+        }
+    }
+
     private var followUpBar: some View {
         HStack(spacing: 7) {
             ZStack(alignment: .topLeading) {
                 PanelInputTextView(text: followUpBinding,
                                    focusRequest: followUpFocusRequest,
+                                   contentInset: NSSize(width: 5, height: 8),
                                    onSubmit: { submitFollowUp() },
                                    onCancel: { model.onExitConversation?() })
                     .frame(height: 34)
@@ -740,13 +772,13 @@ struct ActionPanelView: View {
                          ? AppFlavor.text("已达对话轮数上限，请留档或重新开始", "Turn limit reached — save or start over")
                          : AppFlavor.text("继续追问…", "Ask a follow-up…"))
                         .font(.system(size: 13))
+                        .lineSpacing(2)
                         .foregroundStyle(.tertiary)
                         .padding(.top, 8)
-                        .padding(.leading, 9)
+                        .padding(.leading, 5)
                         .allowsHitTesting(false)
                 }
             }
-            .padding(.horizontal, 3)
             .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.045)))
             .opacity(model.conversationAtTurnLimit ? 0.5 : 1)
 

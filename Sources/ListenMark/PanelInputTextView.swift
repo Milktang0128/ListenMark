@@ -4,6 +4,7 @@ import SwiftUI
 struct PanelInputTextView: NSViewRepresentable {
     @Binding var text: String
     var focusRequest: Int
+    var contentInset: NSSize = .zero
     var onSubmit: (() -> Void)? = nil
     var onCancel: (() -> Void)? = nil
 
@@ -27,7 +28,7 @@ struct PanelInputTextView: NSViewRepresentable {
         textView.isAutomaticTextReplacementEnabled = false
         textView.font = .systemFont(ofSize: 13)
         textView.textColor = .labelColor
-        textView.textContainerInset = .zero
+        textView.textContainerInset = contentInset
         textView.textContainer?.lineFragmentPadding = 0
         textView.textContainer?.widthTracksTextView = true
         textView.textContainer?.containerSize = NSSize(width: scrollView.contentSize.width,

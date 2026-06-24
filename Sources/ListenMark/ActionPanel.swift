@@ -101,7 +101,8 @@ final class ActionPanel: NSPanel {
                 return ActionResultLayout.conversationPanelHeight(priorTurns: model.priorTurns,
                                                                   currentText: text,
                                                                   panelWidth: currentWidth,
-                                                                  barHeight: barHeight)
+                                                                  barHeight: barHeight,
+                                                                  awaitingReply: model.isAwaitingReply)
             }
             if compact { return barHeight + 66 }
             let base = ActionResultLayout.panelHeight(for: text, panelWidth: currentWidth, barHeight: barHeight)

@@ -1232,6 +1232,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         appendTurn(.init(role: .user, text: clean,
                          languageIsEnglish: AppFlavor.uiLanguageIsEnglish))
         panel.model.followUpText = ""
+        // Show the just-typed turn + a "responding" state immediately, before the
+        // answer starts streaming in.
+        syncConversationToPanel()
         runConversationStream()
     }
 
@@ -1324,6 +1327,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     let snapshot = LLMOutputSanitizer.visibleAnswer(from: full)
                     await MainActor.run {
                         guard self.actionGeneration == generation else { return }
+                        // First non-empty delta: the answer is now streaming, so drop
+                        // the loading bubble and let the live text render.
+                        if !snapshot.isEmpty { self.panel.model.isAwaitingReply = false }
                         self.liveConversationSnapshot = snapshot
                         self.panel.model.phase = .result(action: action.name, icon: action.icon,
                                                          text: snapshot, replay: false, archived: false,
@@ -1341,11 +1347,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     guard self.actionGeneration == generation else { return }
                     if !finalText.isEmpty {
                         self.finishConversationTurn(text: finalText, model: provider.model, autoSpeak: false)
+                    } else {
+                        // Cancelled before any text arrived — drop the "responding" state.
+                        self.panel.model.isAwaitingReply = false
                     }
                 }
             } catch {
                 await MainActor.run {
                     guard self.actionGeneration == generation else { return }
+                    self.panel.model.isAwaitingReply = false
                     self.panel.model.phase = .error(AppFlavor.text("出错：\(Self.describe(error))", "Error: \(Self.describe(error))"))
                 }
             }
@@ -1380,9 +1390,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if let last = state.turns.last, last.role == .assistant {
             liveText = last.text
             prior = Array(state.turns.dropLast())
+            panel.model.isAwaitingReply = false
         } else {
-            liveText = currentResult
+            // The user just submitted a turn and the assistant reply hasn't begun
+            // streaming yet. Show the whole thread (including the new user turn) as
+            // history with an empty live answer, and flag the "responding" state —
+            // do NOT fall back to currentResult (that's the prior, stale answer).
+            liveText = ""
             prior = state.turns
+            panel.model.isAwaitingReply = true
         }
         panel.model.priorTurns = prior
         panel.model.conversationAtTurnLimit = conversationAtTurnLimit()
