@@ -117,6 +117,14 @@ final class ActionPanel: NSPanel {
         }
     }
 
+    /// Re-run the size/position pass for the current phase. Used by `restorePanel`
+    /// so a brought-back session re-clamps to the (possibly changed) screen even
+    /// though its phase value didn't change (`$phase.removeDuplicates` would
+    /// otherwise swallow it).
+    func reapplyLayout() {
+        resize(for: model.phase)
+    }
+
     private func resize(for phase: PanelModel.Phase) {
         let w = width(for: phase)
         let h = height(for: phase)
@@ -206,6 +214,12 @@ final class ActionPanel: NSPanel {
             // In the 对话 instruction box, Esc cancels back to the toolbar.
             if case .dialogueInput = model.phase {
                 model.onDialogueCancel?()
+                return true
+            }
+            // Sticky 对话 has no single-turn result to fall back to, so its first
+            // Esc hides-and-preserves the thread (restorable) instead of exiting.
+            if model.isConversing, model.isStickyConversation {
+                model.onHidePreserve?()
                 return true
             }
             // An empty, expanded follow-up box on a non-sticky thread collapses

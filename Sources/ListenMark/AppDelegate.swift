@@ -4,6 +4,41 @@ import SwiftUI
 import ApplicationServices
 import QuartzCore
 
+/// Snapshot of a hidden-but-alive panel session, captured on `hidePanel(preserve:)`
+/// and rehydrated by `restorePanel()`. Captures ALL the AppDelegate scalars a
+/// restored panel reads (Compare baseline, Archive original, Copy-all, follow-up
+/// archiving) — restoring only `conversation` would leave the rest stale.
+private struct PreservedSession {
+    var phase: PanelModel.Phase
+    var currentText: String
+    var currentContext: String
+    var currentContextSource: SelectionGrabber.ContextSource?
+    var currentSource: String
+    var currentSourceMetadata: SourceMetadata?
+    var currentResult: String
+    var currentAction: ActionDef?
+    var currentContextUsed: Bool
+    var pendingEntry: Entry?
+    var lastAutoArchivedEntry: Entry?
+    var conversation: ConversationState?
+    var lastAutoText: String
+
+    // Panel-model mirror needed to rebuild the conversation UI without re-running
+    // showNearMouse (which would reset phase/active/pinned).
+    var active: String?
+    var isConversing: Bool
+    var isStickyConversation: Bool
+    var canFollowUp: Bool
+    var canCompare: Bool
+    var followUpMode: PanelModel.FollowUpMode
+    var priorTurns: [ConversationTurn]
+    var followUpText: String
+    var conversationAtTurnLimit: Bool
+    var contentWidth: CGFloat
+
+    var frameOrigin: NSPoint
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
     private let panel = ActionPanel()
@@ -51,6 +86,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var streamTask: Task<Void, Never>?
     private var actionGeneration = 0
     private var enabledPIDs = Set<pid_t>()
+
+    // #5 hide/restore: a hidden-but-alive panel keeps its full state here so
+    // ⌥⌘D / 状态栏「显示 Dob」can bring the same conversation back.
+    private var preservedSession: PreservedSession?
+    // #6 skill-switch suspend: single recoverable "上个对话" slot. A new root
+    // selection commits + parks the live thread here instead of destroying it.
+    private var suspendedThreads: [ConversationState] = []
+    // Identifies the current root selection. A NEW selection bumps this so a
+    // same-skill re-run on a different selection never resumes the old thread.
+    private var currentSelectionToken = UUID()
+    private weak var restoreMenuItem: NSMenuItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Settings.migrateSecretsToKeychain()   // move any plaintext keys into the Keychain first
@@ -187,6 +233,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         m.onDisableGlobally = { [weak self] in self?.disableAutoPopGlobally() }
         m.onFollowUpSubmit = { [weak self] text in self?.submitFollowUp(text) }
         m.onExitConversation = { [weak self] in self?.exitConversation() }
+        m.onHidePreserve = { [weak self] in self?.hidePanel(preserve: true) }
+        m.onResumeThread = { [weak self] in self?.resumeSuspendedThread() }
         m.onDialogueSubmit = { [weak self] instruction in self?.startDialogue(instruction: instruction) }
         m.onDialogueCancel = { [weak self] in self?.cancelDialogueInput() }
         m.onClose = { [weak self] in self?.closePanel() }
@@ -262,6 +310,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self?.triggerInputPanel()
         }) {
             NSLog("Dob · \(AppFlavor.text("输入面板快捷键注册失败", "input panel hotkey registration failed"))：\(Settings.inputHotKeyDisplay)")
+        }
+        if !HotkeyManager.shared.register(id: 5,
+                                          keyCode: UInt32(Settings.restoreHotKeyCode),
+                                          carbonModifiers: UInt32(Settings.restoreHotKeyMods),
+                                          onFire: { [weak self] in
+            self?.restorePanel()
+        }) {
+            NSLog("Dob · \(AppFlavor.text("显示面板快捷键注册失败", "restore panel hotkey registration failed"))：\(Settings.restoreHotKeyDisplay)")
         }
         registerActionHotKeys()
         triggerMenuItem?.title = "\(AppFlavor.text("处理选中文本", "Process Selection"))  \(Settings.hotKeyDisplay)"
@@ -340,7 +396,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) { [weak self] in
             guard let self else { return }
             guard self.autoPopGeneration == generation else { return }
-            guard !self.panel.isVisible else { return }
+            // A hidden-but-preserved panel reports isVisible==false, so also bail
+            // when a snapshot exists — otherwise the next selection would clobber
+            // a conversation the user can still restore.
+            guard !self.panel.isVisible, self.preservedSession == nil else { return }
             let contextSource = SelectionGrabber.contextSource()
             if let text = SelectionGrabber.axSelectedText() {
                 self.presentAutoSelection(text, contextSource: contextSource)
@@ -358,7 +417,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             SelectionGrabber.copySelectedTextAsync { [weak self] text in
                 guard let self else { return }
                 guard self.autoPopGeneration == generation else { return }
-                guard !self.panel.isVisible else { return }
+                // A hidden-but-preserved panel reports isVisible==false, so also bail
+            // when a snapshot exists — otherwise the next selection would clobber
+            // a conversation the user can still restore.
+            guard !self.panel.isVisible, self.preservedSession == nil else { return }
                 guard let text, !text.isEmpty else {
                     self.clearAutoSelectionState()
                     return
@@ -375,7 +437,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return
         }
         guard clean != lastAutoText else { return }
-        cancelActiveAction()
+        beginNewRootSelection()
         lastAutoText = clean
         captureCurrentSource(contextSource: contextSource)
         currentText = clean
@@ -444,6 +506,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
         }
         let menu = NSMenu()
+        // We control 「显示 Dob」 enablement manually in menuNeedsUpdate, so opt out
+        // of AppKit's automatic enabling (every other item is always actionable).
+        menu.autoenablesItems = false
+        let restore = NSMenuItem(title: AppFlavor.text("显示 Dob", "Show Dob"), action: #selector(restoreFromMenu), keyEquivalent: "")
+        restore.target = self
+        menu.addItem(restore)
+        restoreMenuItem = restore
         let trigger = NSMenuItem(title: AppFlavor.text("处理选中文本", "Process Selection"), action: #selector(triggerFromMenu), keyEquivalent: "")
         trigger.target = self
         menu.addItem(trigger)
@@ -478,10 +547,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         ActionStore.shared.relocalizeBuiltins()
     }
 
-    // Refresh the 今日回响 due-count badge each time the menu opens (passive nudge).
+    // Refresh the 今日回响 due-count badge each time the menu opens (passive nudge),
+    // and enable 「显示 Dob」 only when a hidden session can be restored.
     func menuNeedsUpdate(_ menu: NSMenu) {
         let n = ArchiveStore.shared.dueCount
         reviewMenuItem?.title = n > 0 ? AppFlavor.text("今日回响（\(n)）…", "Review (\(n))…") : AppFlavor.text("今日回响…", "Review…")
+        restoreMenuItem?.isEnabled = preservedSession != nil
     }
 
     private func add(_ menu: NSMenu, _ title: String, _ action: Selector) {
@@ -492,6 +563,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     // MARK: - Trigger
 
+    @objc private func restoreFromMenu() { restorePanel() }
     @objc private func triggerFromMenu() { triggerCapture() }
     @objc private func triggerInputFromMenu() { triggerInputPanel() }
     @objc private func triggerScreenOCRFromMenu() { triggerScreenOCR() }
@@ -514,7 +586,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func triggerScreenOCR(silent: Bool) {
-        cancelActiveAction()
+        beginNewRootSelection()
         let generation = actionGeneration
         captureCurrentSource(contextSource: SelectionGrabber.contextSource(),
                              fallbackName: AppFlavor.text("屏幕内容", "Screen Content"))
@@ -563,7 +635,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func triggerInputPanel() {
-        cancelActiveAction()
+        beginNewRootSelection()
         setManualSource(AppFlavor.text("输入文本", "Input Text"))
         currentText = ""
         currentContext = ""
@@ -578,7 +650,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func triggerSelection(actionID: String?) {
-        cancelActiveAction()
+        beginNewRootSelection()
         let generation = actionGeneration
         let contextSource = SelectionGrabber.contextSource()
         captureCurrentSource(contextSource: contextSource)
@@ -629,7 +701,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let text = (params["text"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
 
-        cancelActiveAction()
+        beginNewRootSelection()
         currentText = text
         currentContext = ""
         currentContextSource = nil
@@ -715,7 +787,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard !panel.model.pinned else { return }
         outsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             guard let self, !self.panel.model.pinned else { return }
-            self.closePanel()
+            // Clicking outside hides-and-preserves (Bob-style keep-alive) rather
+            // than destroying — the session returns via ⌥⌘D / 「显示 Dob」.
+            self.hidePanel(preserve: true)
         }
         if Settings.autoDismissPanel {
             panelMotionMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged, .rightMouseDragged]) { [weak self] _ in
@@ -731,14 +805,142 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func closePanel() {
         // A multi-turn thread is committed once on close — cancelActiveAction
-        // saves and tears it down — so it never auto-archives per turn.
+        // saves and tears it down — so it never auto-archives per turn. Explicit
+        // close also drops any hidden snapshot and the recoverable thread.
         removeOutsideMonitor()
         cancelActiveAction(stopSpeech: false)
+        preservedSession = nil
+        suspendedThreads = []
+        panel.model.hasSuspendedThread = false
         panelIsFadingOut = false
         panel.model.pinned = false
         panel.releaseKeyboardFocus()
         panel.orderOut(nil)
         panel.alphaValue = 1
+    }
+
+    /// Hide the panel without committing or tearing down the conversation: the
+    /// full session is snapshotted into `preservedSession` so ⌥⌘D / 「显示 Dob」
+    /// can bring the exact same state back. Used for outside-click / auto-dismiss
+    /// while a result or conversation is on screen.
+    private func hidePanel(preserve: Bool) {
+        guard preserve else {
+            closePanel()
+            return
+        }
+        // Nothing worth preserving on a bare/transient phase — just close.
+        switch panel.model.phase {
+        case .idle, .captureNotice, .loading:
+            closePanel()
+            return
+        default:
+            break
+        }
+        removeOutsideMonitor()
+        // Keep the partial streamed answer the user already saw, so a restored
+        // conversation shows the same last turn.
+        flushLiveConversationTurn()
+        // Stop the in-flight stream/TTS so a hidden panel never reads an answer
+        // aloud or keeps mutating; the half-answer is already flushed above.
+        actionGeneration += 1
+        streamTask?.cancel()
+        streamTask = nil
+        Speaker.shared.stop()
+
+        preservedSession = PreservedSession(
+            phase: panel.model.phase,
+            currentText: currentText,
+            currentContext: currentContext,
+            currentContextSource: currentContextSource,
+            currentSource: currentSource,
+            currentSourceMetadata: currentSourceMetadata,
+            currentResult: currentResult,
+            currentAction: currentAction,
+            currentContextUsed: currentContextUsed,
+            pendingEntry: pendingEntry,
+            lastAutoArchivedEntry: lastAutoArchivedEntry,
+            conversation: conversation,
+            lastAutoText: lastAutoText,
+            active: panel.model.active,
+            isConversing: panel.model.isConversing,
+            isStickyConversation: panel.model.isStickyConversation,
+            canFollowUp: panel.model.canFollowUp,
+            canCompare: panel.model.canCompare,
+            followUpMode: panel.model.followUpMode,
+            priorTurns: panel.model.priorTurns,
+            followUpText: panel.model.followUpText,
+            conversationAtTurnLimit: panel.model.conversationAtTurnLimit,
+            contentWidth: panel.model.contentWidth,
+            frameOrigin: panel.frame.origin
+        )
+
+        panelIsFadingOut = false
+        panel.model.pinned = false
+        panel.releaseKeyboardFocus()
+        panel.orderOut(nil)
+        panel.alphaValue = 1
+    }
+
+    /// Bring back a hidden-and-preserved session in place. Deliberately does NOT
+    /// call showNearMouse (which resets phase/active/pinned and would destroy the
+    /// state being restored): it rehydrates every scalar + panel-model field, then
+    /// re-runs the resize y-clamp so a bottom-anchored long conversation still fits.
+    private func restorePanel() {
+        guard let s = preservedSession else {
+            // No snapshot — fall back to a fresh capture so the hotkey still does
+            // something useful.
+            triggerCapture()
+            return
+        }
+        preservedSession = nil
+
+        currentText = s.currentText
+        currentContext = s.currentContext
+        currentContextSource = s.currentContextSource
+        currentSource = s.currentSource
+        currentSourceMetadata = s.currentSourceMetadata
+        currentResult = s.currentResult
+        currentAction = s.currentAction
+        currentContextUsed = s.currentContextUsed
+        pendingEntry = s.pendingEntry
+        lastAutoArchivedEntry = s.lastAutoArchivedEntry
+        conversation = s.conversation
+        lastAutoText = s.lastAutoText
+
+        panel.model.active = s.active
+        panel.model.isConversing = s.isConversing
+        panel.model.isStickyConversation = s.isStickyConversation
+        panel.model.canFollowUp = s.canFollowUp
+        panel.model.canCompare = s.canCompare
+        panel.model.followUpMode = s.followUpMode
+        panel.model.priorTurns = s.priorTurns
+        panel.model.followUpText = s.followUpText
+        panel.model.conversationAtTurnLimit = s.conversationAtTurnLimit
+        panel.model.isAwaitingReply = false
+        panel.model.hasSuspendedThread = !suspendedThreads.isEmpty
+        panel.model.pinned = false
+        panel.model.contentWidth = s.contentWidth
+        panel.model.disableAppName = currentDisableCandidate()?.appName
+
+        panelIsFadingOut = false
+        panel.alphaValue = 1
+        panel.setFrameOrigin(s.frameOrigin)
+        panel.requestKeyboardFocus()
+        panel.orderFrontRegardless()
+
+        // Restore the live conversation UI (if any). The phase value may equal the
+        // one held before hiding, so `$phase.removeDuplicates` could swallow it —
+        // re-run the layout pass explicitly to re-clamp to the screen.
+        if conversation != nil {
+            syncConversationToPanel()
+        } else {
+            panel.model.phase = s.phase
+        }
+        panel.reapplyLayout()
+
+        panelShownAt = Date()
+        panelDismissAnchor = NSEvent.mouseLocation
+        refreshOutsideMonitor()
     }
 
     private func handlePanelPointerMotion() {
@@ -822,12 +1024,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             panel.animator().alphaValue = 0
         } completionHandler: { [weak self] in
             guard let self else { return }
-            self.cancelActiveAction(stopSpeech: false)
-            self.panel.model.pinned = false
-            self.panel.releaseKeyboardFocus()
-            self.panel.orderOut(nil)
-            self.panel.alphaValue = 1
-            self.panelIsFadingOut = false
+            // Auto-dismiss only fires for idle/captureNotice (no live conversation),
+            // so hide-preserve routes those straight to a real close while keeping
+            // a single path for any future preservable phase.
+            self.hidePanel(preserve: true)
         }
     }
 
@@ -888,14 +1088,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         closePanel()
     }
 
-    private func cancelActiveAction(stopSpeech: Bool = true) {
+    /// A fresh root selection is being established (selection / OCR / input panel
+    /// / URL / auto-pop). Park the live thread as recoverable, bump the selection
+    /// token so a same-skill re-run never resumes it, and drop any hidden-panel
+    /// snapshot — the user is starting something new.
+    private func beginNewRootSelection() {
+        currentSelectionToken = UUID()
+        preservedSession = nil
+        cancelActiveAction(suspend: true)
+    }
+
+    private func cancelActiveAction(stopSpeech: Bool = true, suspend: Bool = false) {
         // Starting any new action over a live thread saves and ends it first, so
-        // a fresh skill never mixes into the old conversation.
-        if conversation != nil {
-            flushLiveConversationTurn()
-            commitConversation(updatePanel: false)
-            teardownConversation()
-        }
+        // a fresh skill never mixes into the old conversation. When `suspend` is
+        // set the committed thread is parked (recoverable) rather than discarded.
+        endOrSuspendConversation(suspend: suspend)
         lastAutoArchivedEntry = nil
         panel.model.canFollowUp = false
         actionGeneration += 1
@@ -904,6 +1111,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if stopSpeech {
             Speaker.shared.stop()
         }
+    }
+
+    /// Flush the in-flight turn, commit the thread once, then either park it in
+    /// the single recoverable slot (`suspend`) or discard it. No-op without a live
+    /// conversation.
+    private func endOrSuspendConversation(suspend: Bool) {
+        guard conversation != nil else { return }
+        flushLiveConversationTurn()
+        commitConversation(updatePanel: false)
+        if suspend, let state = conversation,
+           state.turns.contains(where: { $0.role == .assistant }) {
+            suspendedThreads = [state]   // single slot (O2)
+        }
+        teardownConversation()
+        panel.model.hasSuspendedThread = !suspendedThreads.isEmpty
+    }
+
+    /// Bring back the single parked 「上个对话」: end whatever single-shot is on
+    /// screen (committing it), then re-seat the suspended thread as the live
+    /// conversation. The new selection's record is untouched.
+    private func resumeSuspendedThread() {
+        guard let state = suspendedThreads.last else { return }
+        // Commit (don't re-park) anything currently live, then drop the slot.
+        cancelActiveAction(suspend: false)
+        suspendedThreads = []
+        conversation = state
+        currentText = state.turns.first(where: { $0.role == .user })?.text ?? currentText
+        currentResult = state.turns.last(where: { $0.role == .assistant })?.text ?? ""
+        currentAction = state.rootAction
+        currentContext = ""
+        currentContextUsed = state.contextUsed
+        currentSource = state.sourceApp
+        currentSourceMetadata = state.sourceMetadata
+        panel.model.active = state.rootAction.id == "dialogue" ? "dialogue" : nil
+        panel.model.isConversing = true
+        panel.model.isStickyConversation = state.rootAction.id == "dialogue"
+        panel.model.canFollowUp = true
+        panel.model.canCompare = false
+        panel.model.followUpMode = .expanded
+        panel.model.hasSuspendedThread = false
+        syncConversationToPanel()
     }
 
     private func retryCurrentAction() {
@@ -970,7 +1218,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return
         }
 
-        cancelActiveAction()
+        // Switching skills over a live thread parks it as recoverable ("上个对话")
+        // rather than destroying it — same selection, new action.
+        cancelActiveAction(suspend: conversation != nil)
         let generation = actionGeneration
         panel.model.active = action.id
         panel.model.canCompare = false
@@ -1539,7 +1789,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return
         }
         if remember { Settings.lastActionID = action.id }
-        cancelActiveAction()
+        // Entering 对话 over a live thread parks it as recoverable ("上个对话").
+        cancelActiveAction(suspend: conversation != nil)
         panel.model.active = action.id
         panel.model.canCompare = false
         panel.model.selectedCompareID = nil

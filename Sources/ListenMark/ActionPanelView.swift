@@ -188,9 +188,12 @@ final class PanelModel: ObservableObject {
     @Published var canFollowUp: Bool = false             // a needsLLM result shows the follow-up affordance
     @Published var followUpMode: FollowUpMode = .collapsed // collapsed 「追问」button vs. expanded input bar
     @Published var isAwaitingReply: Bool = false         // user turn submitted, assistant answer not yet streaming
+    @Published var hasSuspendedThread: Bool = false      // a 「上个对话」 can be resumed (skill-switch parked it)
     @Published var dialogueInstruction: String = ""      // 对话 turn-0 instruction; NEVER synced to currentText
     var onFollowUpSubmit: ((String) -> Void)?
     var onExitConversation: (() -> Void)?
+    var onHidePreserve: (() -> Void)?   // sticky 对话 first Esc: hide-and-preserve
+    var onResumeThread: (() -> Void)?   // restore the suspended 「上个对话」
     var onDialogueSubmit: ((String) -> Void)?
     var onDialogueCancel: (() -> Void)?
 
@@ -637,6 +640,13 @@ struct ActionPanelView: View {
                 }
                 .buttonStyle(.bordered)
                 .help(AppFlavor.text("继续追问", "Ask a follow-up"))
+            }
+            if model.hasSuspendedThread && !model.isConversing {
+                Button { model.onResumeThread?() } label: {
+                    Label(AppFlavor.text("上个对话", "Last chat"), systemImage: "arrow.uturn.backward")
+                }
+                .buttonStyle(.bordered)
+                .help(AppFlavor.text("恢复上一段对话", "Resume the previous conversation"))
             }
             Spacer()
             Button { model.onClose?() } label: { Image(systemName: "xmark") }

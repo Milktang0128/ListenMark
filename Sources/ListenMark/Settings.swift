@@ -583,6 +583,24 @@ enum Settings {
         set { d.set(newValue, forKey: "inputHkDisplay") }
     }
 
+    static var restoreHotKeyCode: Int {
+        get { d.object(forKey: "restoreHkCode") == nil ? Int(kVK_ANSI_D) : d.integer(forKey: "restoreHkCode") }
+        set { d.set(newValue, forKey: "restoreHkCode") }
+    }
+
+    static var restoreHotKeyMods: Int {
+        get { d.object(forKey: "restoreHkMods") == nil ? (optionKey | cmdKey) : d.integer(forKey: "restoreHkMods") }
+        set { d.set(newValue, forKey: "restoreHkMods") }
+    }
+
+    static var restoreHotKeyDisplay: String {
+        get {
+            let s = d.string(forKey: "restoreHkDisplay") ?? ""
+            return s.isEmpty ? "⌥⌘D" : s
+        }
+        set { d.set(newValue, forKey: "restoreHkDisplay") }
+    }
+
     static var ocrAutoRunLastAction: Bool {
         get { d.object(forKey: "ocrAutoRunLastAction") == nil ? true : d.bool(forKey: "ocrAutoRunLastAction") }
         set { d.set(newValue, forKey: "ocrAutoRunLastAction") }
