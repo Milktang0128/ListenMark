@@ -6,8 +6,8 @@ cd "$(dirname "$0")"
 
 swift build -c release
 
-VERSION="${VERSION:-0.3.9}"
-BUILD="${BUILD:-39}"
+VERSION="${VERSION:-0.3.10}"
+BUILD="${BUILD:-40}"
 TIMESTAMP_URL="${TIMESTAMP_URL:-http://timestamp.apple.com/ts01}"
 # Single unified build. LMAppFlavor stays "zh" so the in-app updater's
 # bundle-flavor self-check keeps matching for already-shipped users.
